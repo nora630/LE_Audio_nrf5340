@@ -809,6 +809,9 @@ void audio_datapath_pres_delay_us_get(uint32_t *delay_us)
 void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref_us, bool bad_frame,
 			       uint32_t recv_frame_ts_us)
 {
+	//LOG_INF("sdu_ref_us: %d, recv_frame_ts_us: %d",
+	//			sdu_ref_us, recv_frame_ts_us);
+	
 	if (!ctrl_blk.stream_started) {
 		LOG_WRN("Stream not started");
 		return;
@@ -820,10 +823,25 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		LOG_ERR("buf is NULL");
 	}
 
+
+	/*
 	if (sdu_ref_us == ctrl_blk.previous_sdu_ref_us) {
+
 		LOG_WRN("Duplicate sdu_ref_us (%d) - Dropping audio frame", sdu_ref_us);
 		return;
-	}
+	} */
+	
+
+	/*
+	// voceは2*CONFIG_AUDIO_FRAME_DURATION_USのタイミングで2パケット送っている。
+	// そのため、sdu_ref_usが同じパケットを2つ受信するため、2パケット目の値を調整している。
+	if (sdu_ref_us == ctrl_blk.previous_sdu_ref_us) {
+
+		sdu_ref_us += CONFIG_AUDIO_FRAME_DURATION_US;
+		recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
+	} 
+	*/
+	
 
 	if (bad_frame) {
 		/* Error in the frame or frame lost - sdu_ref_us is stil valid */
@@ -832,13 +850,27 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 
 	bool sdu_ref_not_consecutive = false;
 
+	
+
 	if (ctrl_blk.previous_sdu_ref_us) {
 		uint32_t sdu_ref_delta_us = sdu_ref_us - ctrl_blk.previous_sdu_ref_us;
 
-		/* Check if the delta is from two consecutive frames */
+		// Check if the delta is from two consecutive frames
+		
 		if (sdu_ref_delta_us <
 		    (CONFIG_AUDIO_FRAME_DURATION_US + (CONFIG_AUDIO_FRAME_DURATION_US / 2))) {
-			/* Check for invalid delta */
+		//if(sdu_ref_delta_us <
+		//	(CONFIG_AUDIO_FRAME_DURATION_US * 3)) {
+			// Check for invalid delta
+
+
+			// voceは2*CONFIG_AUDIO_FRAME_DURATION_USのタイミングで2パケット送っている。
+			// そのため、sdu_ref_usが同じパケットを2つ受信するため、2パケット目の値を調整している。
+			//if(sdu_ref_delta_us < (CONFIG_AUDIO_FRAME_DURATION_US / 2)){
+			//	sdu_ref_us += CONFIG_AUDIO_FRAME_DURATION_US;
+			//	recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
+			//}
+			
 			if ((sdu_ref_delta_us >
 			     (CONFIG_AUDIO_FRAME_DURATION_US + SDU_REF_DELTA_MAX_ERR_US)) ||
 			    (sdu_ref_delta_us <
@@ -846,24 +878,35 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 				LOG_DBG("Invalid sdu_ref_us delta (%d) - Estimating sdu_ref_us",
 					sdu_ref_delta_us);
 
-				/* Estimate sdu_ref_us */
+				// Estimate sdu_ref_us 
 				sdu_ref_us = ctrl_blk.previous_sdu_ref_us +
 					     CONFIG_AUDIO_FRAME_DURATION_US;
+
+				//recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
+			
 			}
 		} else {
+
 			LOG_INF("sdu_ref_us not from consecutive frames (diff: %d us)",
 				sdu_ref_delta_us);
 			sdu_ref_not_consecutive = true;
 		}
 	}
+	
+	
 
 	ctrl_blk.previous_sdu_ref_us = sdu_ref_us;
 
 	/*** Presentation compensation ***/
+
+	
 	if (ctrl_blk.pres_comp.enabled) {
 		audio_datapath_presentation_compensation(recv_frame_ts_us, sdu_ref_us,
 							 sdu_ref_not_consecutive);
 	}
+	
+	
+	
 
 	/*** Decode ***/
 
@@ -876,26 +919,33 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		LOG_WRN("SW codec decode error: %d", ret);
 	}
 
+	
 	if (pcm_size != (BLK_STEREO_SIZE_OCTETS * NUM_BLKS_IN_FRAME)) {
 		LOG_WRN("Decoded audio has wrong size");
-		/* Discard frame */
+		// Discard frame
 		return;
 	}
+	
+	
 
 	/*** Add audio data to FIFO buffer ***/
 
 	int32_t num_blks_in_fifo = ctrl_blk.out.prod_blk_idx - ctrl_blk.out.cons_blk_idx;
 
+
+	
 	if ((num_blks_in_fifo + NUM_BLKS_IN_FRAME) > FIFO_NUM_BLKS) {
 		LOG_WRN("Output audio stream overrun - Discarding audio frame");
 
-		/* Discard frame to allow consumer to catch up */
+		// Discard frame to allow consumer to catch up
 		return;
 	}
+	
 
 	uint32_t out_blk_idx = ctrl_blk.out.prod_blk_idx;
 
 	for (uint32_t i = 0; i < NUM_BLKS_IN_FRAME; i++) {
+	//for (uint32_t i = 0; i < 2*NUM_BLKS_IN_FRAME; i++) {
 		if (IS_ENABLED(CONFIG_AUDIO_BIT_DEPTH_16)) {
 			memcpy(&ctrl_blk.out.fifo[out_blk_idx * BLK_STEREO_NUM_SAMPS],
 			       &((int16_t *)ctrl_blk.decoded_data)[i * BLK_STEREO_NUM_SAMPS],
@@ -914,6 +964,7 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 
 	ctrl_blk.out.prod_blk_idx = out_blk_idx;
 }
+
 
 int audio_datapath_start(struct data_fifo *fifo_rx)
 {

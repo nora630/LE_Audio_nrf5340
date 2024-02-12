@@ -456,6 +456,7 @@ int streamctrl_start(void)
 	ERR_CHK_MSG(ret, "Failed to enable broadcast sink");
 
 	ret = bt_mgmt_scan_start(0, 0, BT_MGMT_SCAN_TYPE_BROADCAST, CONFIG_BT_AUDIO_BROADCAST_NAME);
+	//ret = bt_mgmt_scan_start(0, 0, BT_MGMT_SCAN_TYPE_BROADCAST, NULL);
 	ERR_CHK_MSG(ret, "Failed to start scanning");
 
 	started = true;

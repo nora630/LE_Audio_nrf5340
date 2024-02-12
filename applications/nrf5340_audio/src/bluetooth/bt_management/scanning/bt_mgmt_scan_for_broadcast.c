@@ -116,9 +116,11 @@ static bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 		return true;
 	}
 
+/*
 	if (data->data_len < BT_UUID_SIZE_16 + BT_AUDIO_BROADCAST_ID_SIZE) {
 		return true;
 	}
+*/
 
 	if (!bt_uuid_create(&adv_uuid.uuid, data->data, BT_UUID_SIZE_16)) {
 		return false;
@@ -144,19 +146,23 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	struct broadcast_source source = {.broadcast_id = INVALID_BROADCAST_ID};
 
 	/* We are only interested in non-connectable periodic advertisers */
+	
 	if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) || info->interval == 0) {
 		return;
 	}
 
 	bt_data_parse(ad, scan_check_broadcast_source, (void *)&source);
 
+	
 	if (source.broadcast_id != INVALID_BROADCAST_ID) {
-		if (strncmp(source.name, srch_name, BLE_SEARCH_NAME_MAX_LEN) == 0) {
+		//if (strncmp(source.name, srch_name, BLE_SEARCH_NAME_MAX_LEN) == 0) {
 			LOG_INF("Broadcast source %s found, id: 0x%06x", source.name,
 				source.broadcast_id);
 			periodic_adv_sync(info, source.broadcast_id);
-		}
+		//}
 	}
+	
+	
 }
 
 static void pa_synced_cb(struct bt_le_per_adv_sync *sync,
