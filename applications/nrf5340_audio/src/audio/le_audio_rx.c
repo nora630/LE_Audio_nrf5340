@@ -68,7 +68,7 @@ void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, boo
 
 	if ((rx_stats[channel_index].recv_cnt % 100) == 0 && rx_stats[channel_index].recv_cnt) {
 		/* NOTE: The string below is used by the Nordic CI system */
-		LOG_DBG("ISO RX SDUs: Ch: %d Total: %d Bad: %d Size mismatch %d", channel_index,
+		LOG_INF("ISO RX SDUs: Ch: %d Total: %d Bad: %d Size mismatch %d", channel_index,
 			rx_stats[channel_index].recv_cnt, rx_stats[channel_index].bad_frame_cnt,
 			rx_stats[channel_index].data_size_mismatch_cnt);
 	}

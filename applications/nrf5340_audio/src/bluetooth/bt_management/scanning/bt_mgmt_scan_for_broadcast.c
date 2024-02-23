@@ -25,6 +25,7 @@ LOG_MODULE_DECLARE(bt_mgmt_scan);
  */
 #define INVALID_BROADCAST_ID 0xFFFFFFFF
 #define PA_SYNC_SKIP	     5
+
 /* Similar to retries for connections */
 #define SYNC_RETRY_COUNT     6
 
@@ -47,7 +48,7 @@ static uint16_t interval_to_sync_timeout(uint16_t interval)
 	uint16_t timeout;
 
 	/* Ensure that the following calculation does not overflow silently */
-	__ASSERT(SYNC_RETRY_COUNT < 10, "SYNC_RETRY_COUNT shall be less than 10");
+	//__ASSERT(SYNC_RETRY_COUNT < 10, "SYNC_RETRY_COUNT shall be less than 10");
 
 	/* Add retries and convert to unit in 10s of ms */
 	timeout = ((uint32_t)interval * SYNC_RETRY_COUNT) / 10;

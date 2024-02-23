@@ -325,6 +325,7 @@ static void audio_datapath_presentation_compensation(uint32_t recv_frame_ts_us, 
 	if (sdu_ref_not_consecutive) {
 		pres_comp_state_set(PRES_STATE_WAIT);
 	}
+	
 
 	int32_t wanted_pres_dly_us =
 		ctrl_blk.pres_comp.pres_delay_us - (recv_frame_ts_us - sdu_ref_us);
@@ -580,8 +581,10 @@ static void audio_datapath_i2s_blk_complete(uint32_t frame_start_ts, uint32_t *r
 				ctrl_blk.out.cons_blk_idx = next_out_blk_idx;
 				if (underrun_condition) {
 					underrun_condition = false;
+					/*
 					LOG_WRN("Data received, total underruns: %d",
 						ctrl_blk.out.total_blk_underruns);
+						*/
 				}
 
 				tx_buf = (uint8_t *)&ctrl_blk.out
@@ -809,8 +812,6 @@ void audio_datapath_pres_delay_us_get(uint32_t *delay_us)
 void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref_us, bool bad_frame,
 			       uint32_t recv_frame_ts_us)
 {
-	//LOG_INF("sdu_ref_us: %d, recv_frame_ts_us: %d",
-	//			sdu_ref_us, recv_frame_ts_us);
 	
 	if (!ctrl_blk.stream_started) {
 		LOG_WRN("Stream not started");
@@ -823,25 +824,13 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		LOG_ERR("buf is NULL");
 	}
 
-
 	/*
 	if (sdu_ref_us == ctrl_blk.previous_sdu_ref_us) {
 
 		LOG_WRN("Duplicate sdu_ref_us (%d) - Dropping audio frame", sdu_ref_us);
 		return;
-	} */
-	
-
-	/*
-	// voceは2*CONFIG_AUDIO_FRAME_DURATION_USのタイミングで2パケット送っている。
-	// そのため、sdu_ref_usが同じパケットを2つ受信するため、2パケット目の値を調整している。
-	if (sdu_ref_us == ctrl_blk.previous_sdu_ref_us) {
-
-		sdu_ref_us += CONFIG_AUDIO_FRAME_DURATION_US;
-		recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
 	} 
 	*/
-	
 
 	if (bad_frame) {
 		/* Error in the frame or frame lost - sdu_ref_us is stil valid */
@@ -859,17 +848,6 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		
 		if (sdu_ref_delta_us <
 		    (CONFIG_AUDIO_FRAME_DURATION_US + (CONFIG_AUDIO_FRAME_DURATION_US / 2))) {
-		//if(sdu_ref_delta_us <
-		//	(CONFIG_AUDIO_FRAME_DURATION_US * 3)) {
-			// Check for invalid delta
-
-
-			// voceは2*CONFIG_AUDIO_FRAME_DURATION_USのタイミングで2パケット送っている。
-			// そのため、sdu_ref_usが同じパケットを2つ受信するため、2パケット目の値を調整している。
-			//if(sdu_ref_delta_us < (CONFIG_AUDIO_FRAME_DURATION_US / 2)){
-			//	sdu_ref_us += CONFIG_AUDIO_FRAME_DURATION_US;
-			//	recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
-			//}
 			
 			if ((sdu_ref_delta_us >
 			     (CONFIG_AUDIO_FRAME_DURATION_US + SDU_REF_DELTA_MAX_ERR_US)) ||
@@ -881,18 +859,18 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 				// Estimate sdu_ref_us 
 				sdu_ref_us = ctrl_blk.previous_sdu_ref_us +
 					     CONFIG_AUDIO_FRAME_DURATION_US;
-
-				//recv_frame_ts_us += CONFIG_AUDIO_FRAME_DURATION_US;
 			
 			}
+		
 		} else {
-
-			LOG_INF("sdu_ref_us not from consecutive frames (diff: %d us)",
+			
+			LOG_DBG("sdu_ref_us not from consecutive frames (diff: %d us)",
 				sdu_ref_delta_us);
+			
 			sdu_ref_not_consecutive = true;
 		}
-	}
-	
+
+	}	
 	
 
 	ctrl_blk.previous_sdu_ref_us = sdu_ref_us;
